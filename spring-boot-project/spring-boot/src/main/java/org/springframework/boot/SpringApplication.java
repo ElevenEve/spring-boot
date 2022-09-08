@@ -282,6 +282,8 @@ public class SpringApplication {
 		this.resourceLoader = resourceLoader;
 		Assert.notNull(primarySources, "PrimarySources must not be null");
 		this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
+
+		// 类路径推断应用类型
 		this.webApplicationType = WebApplicationType.deduceFromClasspath();
 		this.bootstrapRegistryInitializers = getBootstrapRegistryInitializersFromSpringFactories();
 		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
@@ -289,9 +291,14 @@ public class SpringApplication {
 		this.mainApplicationClass = deduceMainApplicationClass();
 	}
 
+	/**
+	 * 从 Spring工厂获取引导程序注册初始化器
+	 * @return
+	 */
 	@SuppressWarnings("deprecation")
 	private List<BootstrapRegistryInitializer> getBootstrapRegistryInitializersFromSpringFactories() {
 		ArrayList<BootstrapRegistryInitializer> initializers = new ArrayList<>();
+
 		getSpringFactoriesInstances(Bootstrapper.class).stream()
 				.map((bootstrapper) -> ((BootstrapRegistryInitializer) bootstrapper::initialize))
 				.forEach(initializers::add);
@@ -454,6 +461,14 @@ public class SpringApplication {
 		return getSpringFactoriesInstances(type, new Class<?>[] {});
 	}
 
+	/**
+	 * 获取 META-INF/spring.factories属性配置文件对应类型的实例
+	 * @param type
+	 * @param parameterTypes
+	 * @param args
+	 * @param <T>
+	 * @return
+	 */
 	private <T> Collection<T> getSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes, Object... args) {
 		ClassLoader classLoader = getClassLoader();
 		// Use names and ensure unique to protect against duplicates
@@ -723,6 +738,8 @@ public class SpringApplication {
 		if (this.resourceLoader != null) {
 			return this.resourceLoader.getClassLoader();
 		}
+		// 返回要使用的默认 ClassLoader：通常是线程上下文 ClassLoader，
+		// 如果可用；加载 ClassUtils 类的 ClassLoader 将用作后备
 		return ClassUtils.getDefaultClassLoader();
 	}
 
