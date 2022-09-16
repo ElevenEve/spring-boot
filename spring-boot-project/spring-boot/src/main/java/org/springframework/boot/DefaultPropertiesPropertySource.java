@@ -83,8 +83,10 @@ public class DefaultPropertiesPropertySource extends MapPropertySource {
 		if (!CollectionUtils.isEmpty(source)) {
 			Map<String, Object> resultingSource = new HashMap<>();
 			DefaultPropertiesPropertySource propertySource = new DefaultPropertiesPropertySource(resultingSource);
+			// 如果已存在的属性源集合中存在defaultProperties的key时会将source和已存储的defaultProperties属性合并到resultingSource
 			if (sources.contains(NAME)) {
 				mergeIfPossible(source, sources, resultingSource);
+				// 将合并后的resultingSource替换掉原来的defaultProperties
 				sources.replace(NAME, propertySource);
 			}
 			else {

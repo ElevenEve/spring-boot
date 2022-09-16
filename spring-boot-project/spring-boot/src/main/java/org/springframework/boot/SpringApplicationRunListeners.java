@@ -113,6 +113,13 @@ class SpringApplicationRunListeners {
 
 	private void doWithListeners(String stepName, Consumer<SpringApplicationRunListener> listenerAction,
 			Consumer<StartupStep> stepAction) {
+		/**
+		 *  可以跟踪“执行时间”或其他步骤的度量标记
+		 * 		调用start方法来创建和启动的，并被分配一个唯一的id。
+		 * 		处理过程中使用StartupStep.Tags附加信息最后调用end()方法
+		 * 	默认的DefaultApplicationStartup是没有相关操作的空实现
+		 * 	可以参考FlightRecorderStartupStep
+		 */
 		StartupStep step = this.applicationStartup.start(stepName);
 		this.listeners.forEach(listenerAction);
 		if (stepAction != null) {

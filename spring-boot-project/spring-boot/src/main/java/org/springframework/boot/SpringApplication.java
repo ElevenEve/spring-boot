@@ -285,9 +285,13 @@ public class SpringApplication {
 
 		// 类路径推断应用类型
 		this.webApplicationType = WebApplicationType.deduceFromClasspath();
+		// 从META-INFO/spring.factories文件中获取Bootstrapper接口对应的实现类完成初始化并调用其initialize方法
 		this.bootstrapRegistryInitializers = getBootstrapRegistryInitializersFromSpringFactories();
+		// this.initializers完成初始化
 		setInitializers((Collection) getSpringFactoriesInstances(ApplicationContextInitializer.class));
+		// this.listeners 完成初始化  读取配置文件等相关监听器由此初始化
 		setListeners((Collection) getSpringFactoriesInstances(ApplicationListener.class));
+		// 推断应用主类并赋值
 		this.mainApplicationClass = deduceMainApplicationClass();
 	}
 
@@ -306,6 +310,10 @@ public class SpringApplication {
 		return initializers;
 	}
 
+	/**
+	 * 通过构建RuntimeException获取stackTrace，遍历获取其中方法名称为main的类,返回其Class对象
+	 * @return
+	 */
 	private Class<?> deduceMainApplicationClass() {
 		try {
 			StackTraceElement[] stackTrace = new RuntimeException().getStackTrace();
@@ -330,13 +338,19 @@ public class SpringApplication {
 	public ConfigurableApplicationContext run(String... args) {
 		StopWatch stopWatch = new StopWatch();
 		stopWatch.start();
+		// 创建引导程序上下文
 		DefaultBootstrapContext bootstrapContext = createBootstrapContext();
 		ConfigurableApplicationContext context = null;
+		// 配置系统headless模式
 		configureHeadlessProperty();
+		// 加载EventPublishingRunListener等应用程序运行监听器
 		SpringApplicationRunListeners listeners = getRunListeners(args);
+		// 调用监听器的starting方法并支持StartupStep扩展
 		listeners.starting(bootstrapContext, this.mainApplicationClass);
 		try {
+			// 包装应用运行输入参数 p.s. main(String[] args)中的args不传默认为[]不是null
 			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+
 			ConfigurableEnvironment environment = prepareEnvironment(listeners, bootstrapContext, applicationArguments);
 			configureIgnoreBeanInfo(environment);
 			Banner printedBanner = printBanner(environment);
@@ -376,11 +390,20 @@ public class SpringApplication {
 	private ConfigurableEnvironment prepareEnvironment(SpringApplicationRunListeners listeners,
 			DefaultBootstrapContext bootstrapContext, ApplicationArguments applicationArguments) {
 		// Create and configure the environment
+		// 如果未预设env则根据webApplicationType类型创建对应的env对象
 		ConfigurableEnvironment environment = getOrCreateEnvironment();
+		// 配置环境对象相关属性
 		configureEnvironment(environment, applicationArguments.getSourceArgs());
+		/**
+		 * 附加key为configurationProperties的属性源，该属性源是将在之前配置好的所有属性源备份转换为ConfigurationPropertySource对象
+		 * 并允许使用 ConfigurationPropertyName配置属性名称解析调用PropertySourcesPropertyResolver
+		 */
 		ConfigurationPropertySources.attach(environment);
+		// 发布环境就绪事件
 		listeners.environmentPrepared(bootstrapContext, environment);
+		// 将默认属性源移至集合最后
 		DefaultPropertiesPropertySource.moveToEnd(environment);
+		// 将属性源中 spring.main相关属性绑定到SpringApplication实例上
 		bindToSpringApplication(environment);
 		if (!this.isCustomEnvironment) {
 			environment = new EnvironmentConverter(getClassLoader()).convertEnvironmentIfNecessary(environment,
@@ -451,6 +474,7 @@ public class SpringApplication {
 	}
 
 	private SpringApplicationRunListeners getRunListeners(String[] args) {
+		// 构造器使用的参数
 		Class<?>[] types = new Class<?>[] { SpringApplication.class, String[].class };
 		return new SpringApplicationRunListeners(logger,
 				getSpringFactoriesInstances(SpringApplicationRunListener.class, types, this, args),
@@ -462,7 +486,7 @@ public class SpringApplication {
 	}
 
 	/**
-	 * 获取 META-INF/spring.factories属性配置文件对应类型的实例
+	 * 获取 META-INF/spring.factories属性配置文件对应类型的实例并完成初始化
 	 * @param type
 	 * @param parameterTypes
 	 * @param args
@@ -470,9 +494,13 @@ public class SpringApplication {
 	 * @return
 	 */
 	private <T> Collection<T> getSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes, Object... args) {
+		// 获取默认的类加载器
 		ClassLoader classLoader = getClassLoader();
-		// Use names and ensure unique to protect against duplicates
-		Set<String> names = new LinkedHashSet<>(SpringFactoriesLoader.loadFactoryNames(type, classLoader));
+		//  使用SpringFactories类加载器读取META-INFO/spring.factories文件并获取type对应的实现类
+		List<String> factoryNames = SpringFactoriesLoader.loadFactoryNames(type, classLoader);
+		// Use names and ensure unique to protect against duplicates（去重）
+		Set<String> names = new LinkedHashSet<>(factoryNames);
+		// 创建对应实例
 		List<T> instances = createSpringFactoriesInstances(type, parameterTypes, classLoader, args, names);
 		AnnotationAwareOrderComparator.sort(instances);
 		return instances;
@@ -484,9 +512,13 @@ public class SpringApplication {
 		List<T> instances = new ArrayList<>(names.size());
 		for (String name : names) {
 			try {
+				// 根据名称进行类加载
 				Class<?> instanceClass = ClassUtils.forName(name, classLoader);
+				// 用于检测instanceClass是否继承于type
 				Assert.isAssignable(type, instanceClass);
+				// 获取默认声明的构造器
 				Constructor<?> constructor = instanceClass.getDeclaredConstructor(parameterTypes);
+				// 创建对象并初始化
 				T instance = (T) BeanUtils.instantiateClass(constructor, args);
 				instances.add(instance);
 			}
@@ -523,11 +555,14 @@ public class SpringApplication {
 	 * @see #configurePropertySources(ConfigurableEnvironment, String[])
 	 */
 	protected void configureEnvironment(ConfigurableEnvironment environment, String[] args) {
+		// 默认为true,为环境添加属性执行类型转换服务
 		if (this.addConversionService) {
 			ConversionService conversionService = ApplicationConversionService.getSharedInstance();
 			environment.setConversionService((ConfigurableConversionService) conversionService);
 		}
+		// 配置属性源，并默认将args包装成CommandLinePropertySource合并到属性源
 		configurePropertySources(environment, args);
+		// todo  空实现？
 		configureProfiles(environment, args);
 	}
 
@@ -539,11 +574,16 @@ public class SpringApplication {
 	 * @see #configureEnvironment(ConfigurableEnvironment, String[])
 	 */
 	protected void configurePropertySources(ConfigurableEnvironment environment, String[] args) {
+		// 由AbstractEnvironment构造器构造实例时new MutablePropertySources()创建生成
 		MutablePropertySources sources = environment.getPropertySources();
+
+		// 如果预设置了属性源则进行添加合并
 		if (!CollectionUtils.isEmpty(this.defaultProperties)) {
 			DefaultPropertiesPropertySource.addOrMerge(this.defaultProperties, sources);
 		}
+		// this.addCommandLineProperties默认为true
 		if (this.addCommandLineProperties && args.length > 0) {
+			// name = "commandLineArgs"
 			String name = CommandLinePropertySource.COMMAND_LINE_PROPERTY_SOURCE_NAME;
 			if (sources.contains(name)) {
 				PropertySource<?> source = sources.get(name);

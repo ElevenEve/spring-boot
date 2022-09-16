@@ -86,6 +86,7 @@ public class ApplicationConversionService extends FormattingConversionService {
 	}
 
 	/**
+	 * 线程安全的懒加载单例bean
 	 * Return a shared default application {@code ConversionService} instance, lazily
 	 * building it once needed.
 	 * <p>
